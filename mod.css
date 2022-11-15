@@ -11,7 +11,7 @@ body{
     background-color: #4D8AC7;
     justify-content: center;
     flex-wrap: wrap;
-    gap: 5rem;
+    gap: 2rem;
 }
 
 .instructions{
