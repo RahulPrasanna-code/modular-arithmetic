@@ -1,0 +1,734 @@
+<HTML>
+
+<HEAD>
+  <TITLE>IS</TITLE>
+  <link rel="stylesheet" href="mod.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.2/font/bootstrap-icons.css">
+  <SCRIPT LANGUAGE="JavaScript">
+    var modulus = 10;                  // A trivial but recognizable default value
+    var x = 0, y = 0, a = "0", b = "0";  // x,y are operands, a,b are registers
+    var building_x = true, building_y = false; // Direct numerical input to x or y
+    var errflag = false;               // If true, handle error gracefully
+    var resetflag = false;
+    var op = null;
+
+    function errmsg(str) {  // Send Error message to page with string
+      document.write("<BR><B>ERROR</B> (" + errmsg.caller + "): " + str.italics() + "<BR>");
+      return (1);
+    } // errmsg()
+
+    function abs(a) {    // Integer absolute value
+      return ((a < 0) ? -a : a);
+    } // abs()
+
+
+    function Zpair(a, b) { // Describe ordered pair of integers
+      this.length = 3;     // two properties and length of array
+      this.x = a;          // First coord is denoted q
+      this.y = b;          // Second coord is denoted r
+    }  // Zpair object
+
+    // Basic number-theoretic functions.
+    function mod(a, b) {
+      if (b <= 0) {
+        errmsg("modulus" + b + " not positive.");
+        return (-1);
+      } else {
+        return (((a % b) + b) % b);
+      }
+    } // mod()
+
+    function divalg(a, b) {
+      var q = -1, r = -1, negflag = (b < 0);
+      b = abs(b);
+      if (b == 0) {
+        errmsg("b=0.");
+      } else {
+        r = mod(a, b);
+        q = (negflag) ? (r - a) / b : (a - r) / b;
+      }
+      ans = new Zpair(q, r);
+      return ans;
+    }  // divalg()
+
+    function gcd(a, b) {
+      var x, y, d;
+
+      if (a == 0) {
+        if (b == 0) {
+          errmsg("gcd(0,0) does not exist.");
+          x = 0;
+          y = 0;
+          d = 0;
+        } else {
+          x = 0;
+          y = (b > 0) ? 1 : -1;
+          d = abs(b);
+        }
+      } else {
+        if (b == 0) {
+          x = (a > 0) ? 1 : -1;
+          y = 0;
+          d = abs(a);
+        } else {  // This is the non-trivial case
+          var oldr = a, newr = abs(b), oldx = 1, oldy = 0, newx = 0, newy = 1, xtemp = 1, ytemp = 0;
+          var temp = new Zpair(0, 0);
+          while (newr != 0) {
+            temp = divalg(oldr, newr);
+
+            xtemp = oldx; ytemp = oldy;
+            oldx = newx; oldy = newy;
+            newx = xtemp - temp.x * oldx; newy = ytemp - temp.x * oldy;
+
+            oldr = newr;
+            newr = temp.y;
+          } // while newr > 0
+
+          x = oldx;
+          y = (b < 0) ? -oldy : oldy;
+          d = oldr;
+        } // if both a,b non-zero
+      } //if  a != 0
+      if (gcd.arguments.length > 2) { // Read this as signal to also solve
+        // the Diophantine eqn ax+by=gcd
+        var ans = new Zpair(x, y);
+        return (ans);
+      } else { // If x,y requested, else return only d
+        return (d);
+      } // Return options
+
+    } // gcd()
+
+
+    function ModPlus(a, b, m) { // Add a and b modulo m
+      return (mod((a % m) + (b % m), m));
+    } // ModPlus()
+
+    function ModMinus(a, b, m) { // Subtract b from a modulo m
+      return (mod((a % m) - (b % m), m));
+    } // ModMinus()
+
+    function ModTimes(a, b, m) { // Multiply a and b modulo m
+      return (mod((a % m) * (b % m), m));
+    } // ModTimes()
+
+    function ModDivide(a, b, m) {  // If possible,  return a/b mod m
+      var ans = -1, d = 0;       // a=bx (mod m) has soln iff gcd(b,m) divides a
+      var xy = new Zpair(0, 0);
+      if (m <= 0) {
+        errmsg("Non-positive modulus: m = " + m);
+        ans = -1;
+      } else {
+        if ((b % m) == 0) {
+          if ((a % m) == 0) {
+            ans = 1;  // Take 0/0 to be equal to one.
+          } else {  // Cannot divide by zero
+            errmsg("Division by zero.");
+            ans = -1;
+          }  // a%m <> 0
+        } else {
+          if ((a % m) == 0) {
+            ans = 0;  // Easy
+          } else {
+            var xy = new Zpair(0, 0);
+            xy = gcd(b, m, "xy");
+            d = b * xy.x + m * xy.y;
+            if ((a % d) == 0) { // Solution exists
+              ans = mod(xy.x * a / d, m);
+            } else {  // Inidcate no solution by returning -1
+              ans = -1;
+            }
+
+
+          }  // If a%m <> 0
+        }    // If b%m <> 0
+      } // If m > 0
+      return (ans);
+    } // ModDivide()
+
+    function ModExp(a, n, m) { // Use square and multiply to raise a to the power n
+      var ans = -1;            // modulo m
+
+      if (m <= 0) {
+        errmsg(" Modulus m = " + m + " is non-positive ");
+      } else {
+        if (n < 0) {
+          var actualn = n, actuala = a;
+          a = ModDivide(1, a, m);
+          n = abs(n);
+          if (a == -1) {  // Inverse doesn't exist
+            errmsg("Computing " + actuala + " to the power " + actualn + " modulo " + m + ". But exponent is negative and inverse doesn't exist");
+            n = 1;
+          }
+        } // if n < 0
+        ans = 1;
+
+        if (n > 0) {    // Square and multiply algorithm
+          var dummy = a;
+          while (n > 0) {
+            ans = (n % 2) ? ModTimes(ans, dummy, m) : ans;
+            dummy = ModTimes(dummy, dummy, m);
+            n = (n - (n % 2)) / 2;
+
+          } // while n > 0
+
+        } // n>0
+
+
+
+      } // m > 0
+      return (ans);
+    } // ModExp()
+
+    function initialize() { // Initialize global variables
+      x = 0;
+      y = 0;
+      a = "0";
+      b = "0";
+      building_x = true;
+      building_y = false;
+      op = null;
+    } // initialize()
+    function do1() {    // Respond to key press on digit "1"
+      if (resetflag) {  // Clear first
+        doClear();
+        resetflag = false;
+      }
+      if (building_x) {
+        x = 10 * x + 1;
+      }
+      if (building_y) {
+        y = 10 * y + 1;
+      }
+      reDisplay();
+      return (1);
+    }    // do1()
+    function do2() {    // Respond to key press on digit "2"
+      if (resetflag) {  // Clear first
+        doClear();
+        resetflag = false;
+      }
+      if (building_x) {
+        x = 10 * x + 2;
+      }
+      if (building_y) {
+        y = 10 * y + 2;
+      }
+      reDisplay();
+      return (1);
+    }    // do2()
+    function do3() {    // Respond to key press on digit "3"
+      if (resetflag) {  // Clear first
+        doClear();
+        resetflag = false;
+      }
+      if (building_x) {
+        x = 10 * x + 3;
+      }
+      if (building_y) {
+        y = 10 * y + 3;
+      }
+      reDisplay();
+      return (1);
+    }    // do3()
+    function do4() {    // Respond to key press on digit "4"
+      if (resetflag) {  // Clear first
+        doClear();
+        resetflag = false;
+      }
+      if (building_x) {
+        x = 10 * x + 4;
+      }
+      if (building_y) {
+        y = 10 * y + 4;
+      }
+      reDisplay();
+      return (1);
+    }    // do4()
+    function do5() {    // Respond to key press on digit "5"
+      if (resetflag) {  // Clear first
+        doClear();
+        resetflag = false;
+      }
+      if (building_x) {
+        x = 10 * x + 5;
+      }
+      if (building_y) {
+        y = 10 * y + 5;
+      }
+      reDisplay();
+      return (1);
+    }    // do5()
+    function do6() {    // Respond to key press on digit "6"
+      if (resetflag) {  // Clear first
+        doClear();
+        resetflag = false;
+      }
+      if (building_x) {
+        x = 10 * x + 6;
+      }
+      if (building_y) {
+        y = 10 * y + 6;
+      }
+      reDisplay();
+      return (1);
+    }    // do6()
+    function do7() {    // Respond to key press on digit "7"
+      if (resetflag) {  // Clear first
+        doClear();
+        resetflag = false;
+      }
+      if (building_x) {
+        x = 10 * x + 7;
+      }
+      if (building_y) {
+        y = 10 * y + 7;
+      }
+      reDisplay();
+      return (1);
+    }    // do7()
+    function do8() {    // Respond to key press on digit "8"
+      if (resetflag) {  // Clear first
+        doClear();
+        resetflag = false;
+      }
+      if (building_x) {
+        x = 10 * x + 8;
+      }
+      if (building_y) {
+        y = 10 * y + 8;
+      }
+      reDisplay();
+      return (1);
+    }    // do8()
+    function do9() {    // Respond to key press on digit "9"
+      if (resetflag) {  // Clear first
+        doClear();
+        resetflag = false;
+      }
+      if (building_x) {
+        x = 10 * x + 9;
+      }
+      if (building_y) {
+        y = 10 * y + 9;
+      }
+      reDisplay();
+      return (1);
+    }    // do9()
+    function do0() {    // Respond to key press on digit "0"
+      if (resetflag) {  // Clear first
+        doClear();
+        resetflag = false;
+      }
+      if (building_x) {
+        x *= 10;
+      }   // if building x
+      if (building_y) {
+        y *= 10;
+      }   // if building y
+      reDisplay();
+      return (1);
+    }    // do0()
+    function doClear() {    // Respond to key press on "Clear"
+      x = 0;
+      y = 0;
+      op = null;
+      building_x = true;
+      building_y = false;
+      reDisplay();
+      return (1);
+    }    // doClear()
+
+    function doBacksp() {    // Respond to key press on "<-"
+      if (building_x) {
+        if (x >= 0) {
+          x = (x - mod(x, 10)) / 10;
+        } else {
+          x = -(-x - mod(-x, 10)) / 10;
+        } // x pos, neg
+      }
+      if (building_y) {
+        if (y > 0) {
+          y = (y - mod(y, 10)) / 10;
+        } // y pos
+        if (y < 0) {
+          y = -(-y - mod(-y, 10)) / 10;
+        } // y neg
+        if (y == 0) {  // then the operation gets erased
+          op = null;
+          building_y = false;
+          building_x = true;
+        }
+      } // if building y
+      reDisplay();
+      return (1);
+    }    // doBacksp()
+
+    function doPlus() {    // Respond to "+"  operation selection
+      if (building_x) {// Otherwise, there is already an operation specified
+        resetflag = false;
+        op = "+";
+        building_x = false;
+        building_y = true;
+        reDisplay();
+        return (1);
+      } else {
+        return (-1); // in all other cases, ignore and warn
+      }
+    }    // doPlus()
+    function doMinus() {    // Respond to "-"  operation selection
+      if (building_x) {// Otherwise, there is already an operation specified
+        resetflag = false;
+        op = "-";
+        building_x = false;
+        building_y = true;
+        reDisplay();
+        return (1);
+      } else {
+        return (-1); // in all other cases, ignore and warn
+      }
+
+    }    // doMinus()
+    function doTimes() {    // Respond to "*"  operation selection
+      if (building_x) {// Otherwise, there is already an operation specified
+        resetflag = false;
+        op = "*";
+        building_x = false;
+        building_y = true;
+        reDisplay();
+        return (1);
+      } else {
+        return (-1); // in all other cases, ignore and warn
+      }
+    }    // doTimes()
+    function doDivide() {    // Respond to "/"  operation selection
+      if (building_x) {// Otherwise, there is already an operation specified
+        resetflag = false;
+        op = "/";
+        building_x = false;
+        building_y = true;
+        reDisplay();
+        return (1);
+      } else {
+        return (-1); // in all other cases, ignore and warn
+      }
+    }    // doDivide()
+    function doExp() {    // Respond to "x^y"  operation selection
+      if (building_x) {// Otherwise, there is already an operation specified
+        resetflag = false;
+        op = "^";
+        building_x = false;
+        building_y = true;
+        reDisplay();
+        return (1);
+      } else {
+        return (-1); // in all other cases, ignore and warn
+      }
+    }    // doExp()
+    function doGcd() {    // Respond to "gcd"  operation selection
+      if (building_x) {// Otherwise, there is already an operation specified
+        resetflag = false;
+        op = "g";
+        building_x = false;
+        building_y = true;
+        reDisplay();
+        return (1);
+      } else {
+        return (-1); // in all other cases, ignore and warn
+      }
+    }    // doGcd()
+    function doInv() {    // Respond to "INV"  operation selection
+      if (building_x) {
+        x = ModDivide(1, x, modulus);
+        if (x == -1) { // Then inverse does not exist
+          doClear();
+          document.disp.computefield.value = "ERROR (doInv): inverse does not exist";
+        } else {
+          reDisplay();
+        }
+        resetflag = true;    // Clear when new input comes
+      } else {
+        if (building_y) {
+          y = ModDivide(1, y, modulus);
+          if (y == -1) { // Then inverse does not exist
+            doClear();
+            document.disp.computefield.value = "ERROR (doInv): inverse does not exist";
+            resetflag = true;    // Clear when new input comes
+          } else {
+            reDisplay();
+            resetflag = true;    // Clear when new input comes
+          }
+        } else return (-1); // if building y
+
+      } // if building x
+    }    // doInv()
+    function reverseSign() { // Respond to "+/-" command
+      if (y == 0) {
+        x *= -1;
+        if (x != 0) {  // then revise display
+          reDisplay();
+        }
+      } else { // Now y needs to be modified
+        y *= -1;
+        reDisplay();
+      }
+      return (1);
+    }  // reverseSign()
+    function Evaluate() { // Evaluate expression in display
+      if (op != null) {
+        if (op == "+") {
+          x = ModPlus(x, y, modulus);
+          op = null;
+          y = 0;
+          building_x = true;
+          building_y = false;
+          reDisplay();
+        }
+        if (op == "-") {
+          x = ModMinus(x, y, modulus);
+          op = null;
+          y = 0;
+          building_x = true;
+          building_y = false;
+          reDisplay();
+        }
+        if (op == "*") {
+          x = ModTimes(x, y, modulus);
+          op = null;
+          y = 0;
+          building_x = true;
+          building_y = false;
+          reDisplay();
+        }
+        if (op == "/") {
+          x = ModDivide(x, y, modulus);
+          op = null;
+          y = 0;
+          building_x = true;
+          building_y = false;
+          reDisplay();
+        }
+        if (op == "^") {
+          x = ModExp(x, y, modulus);
+          op = null;
+          y = 0;
+          building_x = true;
+          building_y = false;
+          reDisplay();
+        }
+        if (op == "g") {
+          x = gcd(x, y);
+          op = null;
+          y = 0;
+          building_x = true;
+          building_y = false;
+          reDisplay();
+        }
+      } else {  // No operation specified. Blink text
+        x = mod(x, modulus);
+        reDisplay();
+        document.disp.computefield.value.blink();
+        setTimeout("document.disp.computefield.value.fixed()", 1000);
+      } // if op == null
+      resetflag = true;    // Clear when new input comes
+    } // Evaluate()
+    function ChangeModulus() { // Extract modulus from modulusfield
+      modulus = 0;
+      if (document.disp.modulusfield.value.length > 0) { // Otherwise, ignore
+        var i = 0;
+        ch = document.disp.modulusfield.value.charAt(i);
+        while (ch != "1" && ch != "2" && ch != "3" && ch != "4" &&
+          ch != "5" && ch != "6" && ch != "7" && ch != "8" && ch != "9") {
+          i++;
+          ch = document.disp.modulusfield.value.charAt(i);
+        }
+        if (i < document.disp.modulusfield.value.length)
+          modulus = 1 * document.disp.modulusfield.value.substring(i);
+
+      }
+      document.disp.modulusfield.value = " m = " + modulus;
+    }  // ChangeModulus()
+
+    function ChangeA() { // Extract new value for A from A register field
+      a = 0;
+      if (document.disp.Afield.value.length > 0) { // Otherwise, ignore
+        var i = 0;
+        ch = document.disp.Afield.value.charAt(i);
+        while (ch != "1" && ch != "2" && ch != "3" && ch != "4" &&
+          ch != "5" && ch != "6" && ch != "7" && ch != "8" && ch != "9") {
+          i++;
+          ch = document.disp.Afield.value.charAt(i);
+        }
+        if (i < document.disp.Afield.value.length)
+          a = 1 * document.disp.Afield.value.substring(i);
+
+      }
+      document.disp.Afield.value = " " + a;
+    }  // ChangeA()
+
+    function ChangeB() { // Extract new value for B from B register field
+      b = 0;
+      if (document.disp.Bfield.value.length > 0) { // Otherwise, ignore
+        var i = 0;
+        ch = document.disp.Bfield.value.charAt(i);
+        while (ch != "1" && ch != "2" && ch != "3" && ch != "4" &&
+          ch != "5" && ch != "6" && ch != "7" && ch != "8" && ch != "9") {
+          i++;
+          ch = document.disp.Bfield.value.charAt(i);
+        }
+        if (i < document.disp.Bfield.value.length)
+          b = 1 * document.disp.Bfield.value.substring(i);
+
+      }
+      document.disp.Bfield.value = " " + b;
+    }  // ChangeB()
+
+
+    function reDisplay() {  // Centralised refresh/update for display
+      document.disp.computefield.value = " ";
+      if (building_x) {
+        document.disp.computefield.value += x;
+      } else {
+        if (building_y) { // Display op and y
+          document.disp.computefield.value += x;
+          if (op != null) {
+            if (op == "g") {
+              document.disp.computefield.value = " gcd(" +
+                document.disp.computefield.value + ", )";
+            } else {
+              document.disp.computefield.value += op;
+            }
+            if (y != 0) {
+              if (op == "g") {
+                document.disp.computefield.value = " gcd(" + x
+                  + "," + y + ")";
+              } else {
+                document.disp.computefield.value += y;
+              }
+            }
+          }
+        }
+      }
+    } // reDisplay()
+
+
+  </SCRIPT>
+</HEAD>
+
+<BODY onLoad="initialize()">
+
+  <div class="calculator">
+    <h2>Modular Arithmetic Calculator</h2>
+    <FORM class="calc-form" NAME="disp" onSubmit="0">
+      <DIV class="row">
+        <INPUT class="modulo-input functional" TYPE="text" NAME="modulusfield" SIZE=28 VALUE="m = " >
+        <INPUT class="mod-set-btn special" TYPE="button" NAME="entermodulus" VALUE=" Enter Modulus" onClick="ChangeModulus()">
+      </DIV>
+      <DIV class = "row">
+        <INPUT class="input-placeholder functional" TYPE="text" NAME="computefield" SIZE=28 VALUE="">
+        <INPUT class="clearbtn special" TYPE="button" TYPE="button" VALUE="CLEAR" onClick="doClear()">
+      </DIV>
+
+
+      <TABLE>
+        <!-- Row 1 of Button Array -->
+        <tr>
+          <td>
+            <INPUT class="num-btn" TYPE="button" VALUE="7" onClick="do7()">
+          </td>
+          <td>
+            <INPUT class="num-btn" TYPE="button" VALUE="8" onClick="do8()">
+          </td>
+          <td>
+            <INPUT class="num-btn" TYPE="button" VALUE="9" onClick="do9()">
+          </td>
+          <td>
+            <button class="num-btn functional" TYPE="button" onClick="doPlus()"><i class="bi bi-plus-lg" style="font-size: 16px;"></i></button>
+          </td>
+          <td>
+            <INPUT class="num-btn functional last" TYPE="button" VALUE="x^y" onClick="doExp()">
+          </td>
+        </tr>
+        <!-- Row 2 of Button Array -->
+        <tr>
+          <td>
+            <INPUT class="num-btn" TYPE="button" VALUE="4" onClick="do4()">
+          </td>
+          <td>
+            <INPUT class="num-btn" TYPE="button" VALUE="5" onClick="do5()">
+          </td>
+          <td>
+            <INPUT class="num-btn" TYPE="button" VALUE="6" onClick="do6()">
+          </td>
+          <td>
+            <button class="num-btn functional" TYPE="button"  onClick="doMinus()" style="font-size: 16px;"><i class="bi bi-dash-lg"></i></button>
+          </td>
+          <td>
+            <INPUT class="num-btn functional last" TYPE="button" VALUE="INV " onClick="doInv()">
+          </td>
+        </tr>
+        <!-- Row 3 of Button Array -->
+        <tr>
+          <td>
+            <INPUT class="num-btn" TYPE="button" VALUE="1" onClick="do1()">
+          </td>
+          <td>
+            <INPUT class="num-btn" TYPE="button" VALUE="2" onClick="do2()">
+          </td>
+          <td>
+            <INPUT class="num-btn" TYPE="button" VALUE="3" onClick="do3()">
+          </td>
+          <td>
+            <button class="num-btn functional" TYPE="button" onClick="doTimes()"><i class="bi bi-x"></i></button>
+          </td>
+          <td>
+            <INPUT class="num-btn functional last" TYPE="button" VALUE="gcd" onClick="doGcd()">
+          </td>
+        </tr>
+        <!-- Row 4 of Button Array -->
+        <tr>
+          <td>
+            <button class="num-btn functional" TYPE="button" onClick="reverseSign()"><i class="bi bi-plus-slash-minus"></i></button>
+          </td>
+          <td>
+            <INPUT class="num-btn" TYPE="button" VALUE="0" onClick="do0()">
+          </td>
+          <td>
+            <button class="num-btn functional" TYPE="button" onClick="doBacksp()"><i class="bi bi-arrow-left"></i></button>
+          </td>
+          <td>
+            <INPUT class="num-btn functional" TYPE="button" VALUE="/" onClick="doDivide()">
+          </td>
+          <td>
+            <INPUT class="num-btn special last" TYPE="button" VALUE="=" onClick="Evaluate()">
+          </td>
+        </tr>
+
+        </tr>
+      </TABLE>
+    </FORM>
+  </div>
+  <div class="instructions">
+    <h2>How To use?</h2>
+    <div class="content-htu">
+      <ol>
+        <li>First define the modulus by entering its value in the modulus Field and click enter modulus</li>
+        <li>Enter an integer by clicking on numeric buttons. (keyboard number functionalities or unavailable as of now)</li>
+        <li>Most operations (including greatest common divisor, "g") are binary and are entered in "infix" form.</li>
+        <li>Enter the second operand.</li>
+        <li>Click on the "=" sign to perform the calculation</li>
+        <li>Example: With modulus m = 50, clicking the four buttons 6 * 9 = will yield the answer 4 since 6*9=54 and 54 MOD 50 = 4</li>
+        <li>For gcd
+          <ol>
+            <li>Click on any number a</li>
+            <li>Click on gcd</li>
+            <li>Click on second number b</li>
+            <li>Click on '=' and now you will obtain gcd(a,b) with respect to given modulo</li>
+          </ol>
+        </li>
+      </ol>
+    </div>
+  </div>
+</BODY>
+
+</HTML>
